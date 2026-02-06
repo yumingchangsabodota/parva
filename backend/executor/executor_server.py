@@ -31,29 +31,29 @@ logger = logging.getLogger("executor")
 WORKSPACE = Path("/workspace")
 SKILLS_DIR = WORKSPACE / ".skills"
 PY_DEPS_CACHE = WORKSPACE / ".deps_installed"
-NPM_DEPS_CACHE = WORKSPACE / ".npm_deps_installed"
+BUN_DEPS_CACHE = WORKSPACE / ".bun_deps_installed"
 
 # Track installed dependencies to avoid re-installing
 _installed_py_deps: set[str] = set()
-_installed_npm_deps: set[str] = set()
+_installed_bun_deps: set[str] = set()
 
 
 def _load_installed_deps():
-    global _installed_py_deps, _installed_npm_deps
+    global _installed_py_deps, _installed_bun_deps
     if PY_DEPS_CACHE.exists():
         text = PY_DEPS_CACHE.read_text().strip()
         _installed_py_deps = set(text.split("\n")) if text else set()
-    if NPM_DEPS_CACHE.exists():
-        text = NPM_DEPS_CACHE.read_text().strip()
-        _installed_npm_deps = set(text.split("\n")) if text else set()
+    if BUN_DEPS_CACHE.exists():
+        text = BUN_DEPS_CACHE.read_text().strip()
+        _installed_bun_deps = set(text.split("\n")) if text else set()
 
 
 def _save_installed_deps():
     PY_DEPS_CACHE.parent.mkdir(parents=True, exist_ok=True)
     if _installed_py_deps:
         PY_DEPS_CACHE.write_text("\n".join(_installed_py_deps))
-    if _installed_npm_deps:
-        NPM_DEPS_CACHE.write_text("\n".join(_installed_npm_deps))
+    if _installed_bun_deps:
+        BUN_DEPS_CACHE.write_text("\n".join(_installed_bun_deps))
 
 
 # ── Language-specific dependency installers ────────────────────────────
@@ -75,20 +75,20 @@ async def _install_python_deps(new_deps: list[str], log_fn) -> str | None:
     return None
 
 
-async def _install_npm_deps(new_deps: list[str], skill_dir: Path, log_fn) -> str | None:
-    """Install npm deps globally. Returns error string or None on success."""
-    log_fn(f"Installing npm dependencies: {new_deps}")
+async def _install_bun_deps(new_deps: list[str], skill_dir: Path, log_fn) -> str | None:
+    """Install JS/TS deps via bun globally. Returns error string or None on success."""
+    log_fn(f"Installing JS/TS dependencies: {new_deps}")
     result = subprocess.run(
-        ["npm", "install", "-g", "--silent"] + new_deps,
+        ["bun", "add", "--global"] + new_deps,
         capture_output=True,
         text=True,
         timeout=120,
     )
     if result.returncode != 0:
-        return f"npm install failed: {result.stderr}"
-    _installed_npm_deps.update(new_deps)
+        return f"bun add failed: {result.stderr}"
+    _installed_bun_deps.update(new_deps)
     _save_installed_deps()
-    log_fn("npm dependencies installed.")
+    log_fn("JS/TS dependencies installed.")
     return None
 
 
@@ -103,10 +103,10 @@ def _build_command(language: str, script_path: Path) -> list[str]:
         return [sys.executable, str(script_path)]
 
     if lang in ("typescript", "ts") or ext in (".ts", ".tsx"):
-        return ["tsx", str(script_path)]
+        return ["bun", "run", str(script_path)]
 
     if lang in ("javascript", "js", "node") or ext in (".js", ".mjs"):
-        return ["node", str(script_path)]
+        return ["bun", "run", str(script_path)]
 
     if lang in ("bash", "sh", "shell") or ext in (".sh", ".bash"):
         return ["bash", str(script_path)]
@@ -121,7 +121,7 @@ def _get_dep_installer(language: str):
     if lang in ("python", "py"):
         return _install_python_deps, _installed_py_deps
     if lang in ("typescript", "ts", "javascript", "js", "node"):
-        return _install_npm_deps, _installed_npm_deps
+        return _install_bun_deps, _installed_bun_deps
     return None, set()
 
 
@@ -211,16 +211,16 @@ async def execute(request: web.Request) -> web.Response:
         # Also handle package.json if present for TS/JS skills
         pkg_json = skill_dir / "package.json"
         if pkg_json.exists() and language.lower() in ("typescript", "ts", "javascript", "js", "node"):
-            log("Found package.json, running npm install...")
+            log("Found package.json, running bun install...")
             result = subprocess.run(
-                ["npm", "install", "--silent"],
+                ["bun", "install"],
                 cwd=str(skill_dir),
                 capture_output=True,
                 text=True,
                 timeout=120,
             )
             if result.returncode != 0:
-                log(f"npm install failed: {result.stderr}")
+                log(f"bun install failed: {result.stderr}")
                 # Non-fatal — global deps might be enough
 
         # 3. Write injected files to workspace
