@@ -1,0 +1,33 @@
+{
+  "name": "file_analyzer",
+  "description": "Analyze files — extract text from PDFs, parse CSVs/Excel, read documents, get image metadata, etc.",
+  "version": "1.0.0",
+  "author": "parva",
+  "entrypoint": "main.py",
+  "language": "python",
+  "dependencies": ["PyPDF2", "openpyxl", "python-docx", "pillow"],
+  "params": [
+    {
+      "name": "filename",
+      "type": "string",
+      "description": "Name of the file in the workspace files directory",
+      "required": true
+    },
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Action: 'extract_text', 'summarize_structure', 'get_metadata', 'to_csv'",
+      "required": false,
+      "default": "extract_text"
+    },
+    {
+      "name": "max_chars",
+      "type": "integer",
+      "description": "Maximum characters to return",
+      "required": false,
+      "default": 10000
+    }
+  ],
+  "tags": ["file", "document", "pdf", "csv", "excel"],
+  "timeout_seconds": 120
+}

@@ -1,0 +1,50 @@
+{
+  "name": "data_visualizer",
+  "description": "Create charts and visualizations from data. Supports bar, line, scatter, pie, histogram charts.",
+  "version": "1.0.0",
+  "author": "parva",
+  "entrypoint": "main.py",
+  "language": "python",
+  "dependencies": ["matplotlib", "pandas", "numpy"],
+  "params": [
+    {
+      "name": "chart_type",
+      "type": "string",
+      "description": "Chart type: 'bar', 'line', 'scatter', 'pie', 'histogram'",
+      "required": true
+    },
+    {
+      "name": "data",
+      "type": "object",
+      "description": "Data as {labels: [...], values: [...]} or {x: [...], y: [...]}",
+      "required": true
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "description": "Chart title",
+      "required": false,
+      "default": "Chart"
+    },
+    {
+      "name": "xlabel",
+      "type": "string",
+      "description": "X-axis label",
+      "required": false
+    },
+    {
+      "name": "ylabel",
+      "type": "string",
+      "description": "Y-axis label",
+      "required": false
+    },
+    {
+      "name": "filename",
+      "type": "string",
+      "description": "Optional CSV file from workspace to use as data source",
+      "required": false
+    }
+  ],
+  "tags": ["chart", "visualization", "data", "plot"],
+  "timeout_seconds": 60
+}

@@ -1,0 +1,19 @@
+{
+  "name": "code_executor",
+  "description": "Execute Python code snippets. Useful for calculations, data analysis, transformations, and general scripting.",
+  "version": "1.0.0",
+  "author": "parva",
+  "entrypoint": "main.py",
+  "language": "python",
+  "dependencies": [],
+  "params": [
+    {
+      "name": "code",
+      "type": "string",
+      "description": "Python code to execute",
+      "required": true
+    }
+  ],
+  "tags": ["code", "python", "compute"],
+  "timeout_seconds": 120
+}

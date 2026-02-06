@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parva-backend
+  namespace: parva
+  labels:
+    app: parva
+    component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: parva
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: parva
+        component: backend
+    spec:
+      serviceAccountName: parva-executor
+      containers:
+        - name: backend
+          image: parva-backend:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: parva-config
+            - secretRef:
+                name: parva-secrets
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /docs
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /docs
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: parva-backend
+  namespace: parva
+spec:
+  selector:
+    app: parva
+    component: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: parva-config
+  namespace: parva
+data:
+  PARVA_POSTGRES_HOST: parva-postgres
+  PARVA_POSTGRES_PORT: "5432"
+  PARVA_POSTGRES_DB: parva
+  PARVA_REDIS_URL: redis://parva-redis:6379/0
+  PARVA_MINIO_ENDPOINT: parva-minio:9000
+  PARVA_MINIO_BUCKET: parva-files
+  PARVA_LITELLM_BASE_URL: http://litellm:4000/v1
+  PARVA_EXECUTOR_IMAGE: parva-executor:latest
+  PARVA_EXECUTOR_WORKSPACE_BASE: /var/parva/workspaces
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: parva-secrets
+  namespace: parva
+type: Opaque
+stringData:
+  PARVA_POSTGRES_USER: parva
+  PARVA_POSTGRES_PASSWORD: changeme-in-production
+  PARVA_MINIO_ACCESS_KEY: parva
+  PARVA_MINIO_SECRET_KEY: changeme-in-production
+  PARVA_LITELLM_API_KEY: sk-parva
+
+---
+# ServiceAccount for executor pod creation
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: parva-executor
+  namespace: parva
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: parva-executor-role
+  namespace: parva
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "delete", "get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: parva-executor-binding
+  namespace: parva
+subjects:
+  - kind: ServiceAccount
+    name: parva-executor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: parva-executor-role

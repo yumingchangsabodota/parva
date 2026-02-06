@@ -1,0 +1,32 @@
+{
+  "name": "web_scraper",
+  "description": "Scrape web pages and extract content. Can fetch URLs and return cleaned text or structured data.",
+  "version": "1.0.0",
+  "author": "parva",
+  "entrypoint": "main.py",
+  "language": "python",
+  "dependencies": ["requests", "beautifulsoup4", "lxml"],
+  "params": [
+    {
+      "name": "url",
+      "type": "string",
+      "description": "URL to scrape",
+      "required": true
+    },
+    {
+      "name": "selector",
+      "type": "string",
+      "description": "Optional CSS selector to extract specific elements",
+      "required": false
+    },
+    {
+      "name": "format",
+      "type": "string",
+      "description": "'text' for clean text, 'html' for raw HTML, 'links' for all links",
+      "required": false,
+      "default": "text"
+    }
+  ],
+  "tags": ["web", "scrape", "fetch"],
+  "timeout_seconds": 60
+}
