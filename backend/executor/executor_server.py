@@ -111,19 +111,19 @@ async def execute(request: web.Request) -> web.Response:
                 "logs": "\n".join(logs_buffer),
             })
 
-        # 2. Install dependencies (only new ones)
+        # 2. Install dependencies via uv (only new ones)
         _load_installed_deps()
         new_deps = [d for d in dependencies if d not in _installed_deps]
         if new_deps:
             log(f"Installing dependencies: {new_deps}")
             result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", "--quiet"] + new_deps,
+                ["uv", "pip", "install", "--system", "--quiet"] + new_deps,
                 capture_output=True,
                 text=True,
                 timeout=120,
             )
             if result.returncode != 0:
-                log(f"pip install failed: {result.stderr}")
+                log(f"uv pip install failed: {result.stderr}")
                 return web.json_response({
                     "status": "failed",
                     "error": f"Dependency installation failed: {result.stderr}",
