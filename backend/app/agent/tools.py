@@ -110,6 +110,7 @@ def create_execute_skill_tool(executor_service, skill_registry, minio_service, r
             skill_name=skill_name,
             skill_source=base64.b64encode(skill_source_archive).decode(),
             entrypoint=manifest.entrypoint,
+            language=manifest.language,
             params=params,
             dependencies=manifest.dependencies,
             files=files,
