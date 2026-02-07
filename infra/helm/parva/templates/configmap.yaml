@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "parva.fullname" . }}-config
+  labels:
+    {{- include "parva.labels" . | nindent 4 }}
+data:
+  PARVA_POSTGRES_HOST: {{ include "parva.fullname" . }}-postgresql
+  PARVA_POSTGRES_PORT: "5432"
+  PARVA_POSTGRES_DB: {{ .Values.postgresql.auth.database }}
+  PARVA_REDIS_URL: redis://{{ include "parva.fullname" . }}-redis:6379/0
+  PARVA_MINIO_ENDPOINT: {{ include "parva.fullname" . }}-minio:9000
+  PARVA_MINIO_BUCKET: {{ .Values.minio.bucket }}
+  PARVA_LITELLM_BASE_URL: {{ .Values.litellm.baseUrl }}
+  PARVA_EXECUTOR_IMAGE: {{ include "parva.image" (dict "global" .Values.global "repository" .Values.backend.executor.image.repository "tag" .Values.backend.executor.image.tag) }}
+  PARVA_EXECUTOR_WORKSPACE_BASE: {{ .Values.backend.executor.workspaceBase }}

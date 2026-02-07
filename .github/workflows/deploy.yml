@@ -1,0 +1,56 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (default: latest)"
+        required: false
+        default: latest
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install parva ./infra/helm/parva \
+            --namespace parva \
+            --create-namespace \
+            --set global.imageRegistry=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }} \
+            --set backend.image.tag=${{ steps.tag.outputs.tag }} \
+            --set frontend.image.tag=${{ steps.tag.outputs.tag }} \
+            --set backend.executor.image.tag=${{ steps.tag.outputs.tag }} \
+            --set postgresql.auth.password=${{ secrets.POSTGRES_PASSWORD }} \
+            --set minio.auth.secretKey=${{ secrets.MINIO_SECRET_KEY }} \
+            --set litellm.apiKey=${{ secrets.LITELLM_API_KEY }} \
+            --set ingress.host=${{ vars.PARVA_HOST || 'parva.example.com' }} \
+            --wait --timeout 5m

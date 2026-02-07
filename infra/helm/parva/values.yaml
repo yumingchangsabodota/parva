@@ -1,0 +1,124 @@
+# -- Global settings
+global:
+  imageRegistry: ""  # e.g. ghcr.io/yumingchangsabodota
+
+# -- Backend (FastAPI + LangGraph)
+backend:
+  replicaCount: 2
+  image:
+    repository: parva-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  # Executor sidecar settings
+  executor:
+    image:
+      repository: parva-executor
+      tag: latest
+    workspaceBase: /var/parva/workspaces
+
+# -- Frontend (Next.js)
+frontend:
+  replicaCount: 2
+  image:
+    repository: parva-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# -- PostgreSQL
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: 16-alpine
+  auth:
+    username: parva
+    password: changeme-in-production
+    database: parva
+  storage:
+    size: 10Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# -- Redis
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+  storage:
+    size: 2Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# -- MinIO (S3-compatible object storage)
+minio:
+  enabled: true
+  image:
+    repository: minio/minio
+    tag: latest
+  auth:
+    accessKey: parva
+    secretKey: changeme-in-production
+  bucket: parva-files
+  storage:
+    size: 20Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# -- LiteLLM
+litellm:
+  baseUrl: http://litellm:4000/v1
+  apiKey: sk-parva
+
+# -- Ingress
+ingress:
+  enabled: true
+  className: nginx
+  host: parva.example.com
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: 100m
+    nginx.ingress.kubernetes.io/websocket-services: "{{ .Release.Name }}-backend"
+  tls: []
+  #  - secretName: parva-tls
+  #    hosts:
+  #      - parva.example.com

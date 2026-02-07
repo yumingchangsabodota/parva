@@ -1,0 +1,12 @@
+apiVersion: v2
+name: parva
+description: Enterprise AI agent chatbot platform with isolated skill execution
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - ai
+  - agent
+  - chatbot
+  - langgraph
+home: https://github.com/yumingchangsabodota/parva
