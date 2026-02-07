@@ -1,0 +1,35 @@
+{
+  "name": "Parva",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.12" }
+  },
+  "forwardPorts": [3000, 8000, 4000, 9001],
+  "portsAttributes": {
+    "3000": { "label": "Frontend", "onAutoForward": "openBrowser" },
+    "8000": { "label": "Backend API", "onAutoForward": "notify" },
+    "4000": { "label": "LiteLLM", "onAutoForward": "ignore" },
+    "9001": { "label": "MinIO Console", "onAutoForward": "ignore" }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "secrets": {
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API key for GPT models (optional if using Anthropic only)"
+    },
+    "ANTHROPIC_API_KEY": {
+      "description": "Anthropic API key for Claude models (optional if using OpenAI only)"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+}
