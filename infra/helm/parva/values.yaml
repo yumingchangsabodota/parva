@@ -82,6 +82,16 @@ redis:
       cpu: 500m
       memory: 512Mi
 
+# -- Redis Commander (web UI for Redis)
+redisCommander:
+  enabled: true
+  image:
+    repository: rediscommander/redis-commander
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8081
+
 # -- MinIO (S3-compatible object storage)
 minio:
   enabled: true

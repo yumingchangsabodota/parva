@@ -20,6 +20,7 @@ data:
     general_settings:
       master_key: {{ .Values.litellm.masterKey }}
       allow_requests_on_no_key: true
+      database_url: os.environ/DATABASE_URL
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -48,6 +49,18 @@ spec:
             - name: http
               containerPort: 4000
           env:
+            - name: DATABASE_URL
+              value: "postgresql://$(PARVA_POSTGRES_USER):$(PARVA_POSTGRES_PASSWORD)@{{ include "parva.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+            - name: PARVA_POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "parva.fullname" . }}-secrets
+                  key: PARVA_POSTGRES_USER
+            - name: PARVA_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "parva.fullname" . }}-secrets
+                  key: PARVA_POSTGRES_PASSWORD
             {{- range $key, $value := .Values.litellm.providerKeys }}
             {{- if $value }}
             - name: {{ $key }}

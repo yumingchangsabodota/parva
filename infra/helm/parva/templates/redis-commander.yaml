@@ -1,0 +1,54 @@
+{{- if .Values.redisCommander.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "parva.fullname" . }}-redis-commander
+  labels:
+    {{- include "parva.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-commander
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "parva.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis-commander
+  template:
+    metadata:
+      labels:
+        {{- include "parva.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: redis-commander
+    spec:
+      containers:
+        - name: redis-commander
+          image: "{{ .Values.redisCommander.image.repository }}:{{ .Values.redisCommander.image.tag }}"
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            - name: REDIS_HOSTS
+              value: "local:{{ include "parva.fullname" . }}-redis:6379"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "parva.fullname" . }}-redis-commander
+  labels:
+    {{- include "parva.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-commander
+spec:
+  type: {{ .Values.redisCommander.service.type }}
+  ports:
+    - port: {{ .Values.redisCommander.service.port }}
+      targetPort: http
+      name: http
+  selector:
+    {{- include "parva.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-commander
+{{- end }}

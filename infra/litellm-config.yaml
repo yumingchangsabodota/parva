@@ -42,3 +42,6 @@ general_settings:
   master_key: sk-parva-internal
   # Allow any internal service to call without a key
   allow_requests_on_no_key: true
+  # PostgreSQL for storing keys, usage tracking, spend logs
+  # DATABASE_URL is set via env var — LiteLLM auto-creates its tables
+  database_url: os.environ/DATABASE_URL

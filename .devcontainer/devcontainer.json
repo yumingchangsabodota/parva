@@ -6,11 +6,12 @@
     "ghcr.io/devcontainers/features/node:1": { "version": "20" },
     "ghcr.io/devcontainers/features/python:1": { "version": "3.12" }
   },
-  "forwardPorts": [3000, 8000, 4000, 9001],
+  "forwardPorts": [3000, 8000, 4000, 8081, 9001],
   "portsAttributes": {
     "3000": { "label": "Frontend", "onAutoForward": "openBrowser" },
     "8000": { "label": "Backend API", "onAutoForward": "notify" },
     "4000": { "label": "LiteLLM", "onAutoForward": "ignore" },
+    "8081": { "label": "Redis Commander", "onAutoForward": "ignore" },
     "9001": { "label": "MinIO Console", "onAutoForward": "ignore" }
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
