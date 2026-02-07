@@ -25,6 +25,7 @@ export default function ChatInput() {
   const setCurrentThread = useAppStore((s) => s.setCurrentThread);
   const addMessage = useAppStore((s) => s.addMessage);
   const upsertMessage = useAppStore((s) => s.upsertMessage);
+  const mergeMessage = useAppStore((s) => s.mergeMessage);
   const isStreaming = useAppStore((s) => s.isStreaming);
   const setIsStreaming = useAppStore((s) => s.setIsStreaming);
   const uploadedFiles = useAppStore((s) => s.uploadedFiles);
@@ -68,13 +69,21 @@ export default function ChatInput() {
             }
             break;
           case "message_chunk":
+            // Streaming AI text token — upsert by message ID (appends content)
             if (event.message) {
               upsertMessage(event.message);
             }
             break;
-          case "message_complete":
+          case "tool_call_start":
+            // Agent decided to call tool(s) — attach tool_calls to the
+            // current assistant message (same ID) without touching content
+            if (event.message_id && event.tool_calls) {
+              mergeMessage(event.message_id, { tool_calls: event.tool_calls });
+            }
+            break;
+          case "tool_result":
+            // Tool execution result — add as a new tool message
             if (event.message) {
-              // For complete messages (tool results, final AI), add directly
               addMessage(event.message);
             }
             break;

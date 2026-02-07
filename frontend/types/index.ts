@@ -66,9 +66,11 @@ export interface ExecutionProgress {
 }
 
 export interface StreamEvent {
-  type: "metadata" | "message_chunk" | "message_complete" | "error" | "done";
+  type: "metadata" | "message_chunk" | "tool_call_start" | "tool_result" | "error" | "done";
   thread_id?: string;
   message?: ChatMessage;
+  message_id?: string;
+  tool_calls?: ToolCall[];
   error?: string;
 }
 

@@ -83,22 +83,30 @@ async def chat(req: ChatRequest, state=Depends(get_app_state)):
 
 @router.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest, state=Depends(get_app_state)):
-    """Stream raw LangGraph messages via Server-Sent Events.
+    """Stream LangGraph messages via Server-Sent Events.
+
+    Uses stream_mode=["messages", "updates"]:
+    - "messages" mode → token-level AI text streaming (message_chunk)
+    - "updates" mode  → node-level events for tool calls and results
 
     Events:
       - metadata:         {type, thread_id}
-      - message_chunk:    {type, message}  — AIMessageChunk (streaming token)
-      - message_complete: {type, message}  — ToolMessage or final AI message
+      - message_chunk:    {type, message}  — AIMessageChunk text token
+      - tool_call_start:  {type, tool_calls}  — agent decided to call tool(s)
+      - tool_result:      {type, message}  — tool execution result
       - error:            {type, error}
       - done:             {type, thread_id}
     """
     thread_id = req.thread_id or str(uuid.uuid4())
 
+    def _sse(data: dict) -> str:
+        return f"data: {json.dumps(data, default=str)}\n\n"
+
     async def event_generator():
-        yield f"data: {json.dumps({'type': 'metadata', 'thread_id': thread_id})}\n\n"
+        yield _sse({"type": "metadata", "thread_id": thread_id})
 
         try:
-            async for chunk, metadata in state.agent.stream(
+            async for mode, chunk in state.agent.stream(
                 message=req.message,
                 thread_id=thread_id,
                 user_id=req.user_id,
@@ -106,19 +114,47 @@ async def chat_stream(req: ChatRequest, state=Depends(get_app_state)):
                 image_model=req.image_model,
                 file_keys=req.files,
             ):
-                msg_data = serialize_message(chunk)
-                chunk_type = type(chunk).__name__
+                if mode == "messages":
+                    msg_chunk, metadata = chunk
+                    chunk_type = type(msg_chunk).__name__
 
-                if chunk_type == "AIMessageChunk":
-                    yield f"data: {json.dumps({'type': 'message_chunk', 'message': msg_data}, default=str)}\n\n"
-                else:
-                    yield f"data: {json.dumps({'type': 'message_complete', 'message': msg_data}, default=str)}\n\n"
+                    # Only emit AI text tokens from messages mode
+                    if chunk_type == "AIMessageChunk" and msg_chunk.content:
+                        msg_data = serialize_message(msg_chunk)
+                        yield _sse({"type": "message_chunk", "message": msg_data})
+
+                elif mode == "updates":
+                    # Node-level updates: {node_name: {state_delta}}
+                    for node_name, node_data in chunk.items():
+                        if not isinstance(node_data, dict):
+                            continue
+                        messages = node_data.get("messages", [])
+                        for msg in messages:
+                            # Agent node produced tool calls
+                            if node_name == "agent" and getattr(msg, "tool_calls", None):
+                                tool_calls = [
+                                    {
+                                        "id": tc.get("id", "") if isinstance(tc, dict) else getattr(tc, "id", ""),
+                                        "name": tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", ""),
+                                        "args": tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {}),
+                                    }
+                                    for tc in msg.tool_calls
+                                ]
+                                yield _sse({
+                                    "type": "tool_call_start",
+                                    "message_id": getattr(msg, "id", None),
+                                    "tool_calls": tool_calls,
+                                })
+                            # Tools node produced results
+                            elif node_name == "tools" and getattr(msg, "type", None) == "tool":
+                                msg_data = serialize_message(msg)
+                                yield _sse({"type": "tool_result", "message": msg_data})
 
         except Exception as e:
             logger.exception("Streaming error")
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+            yield _sse({"type": "error", "error": str(e)})
 
-        yield f"data: {json.dumps({'type': 'done', 'thread_id': thread_id})}\n\n"
+        yield _sse({"type": "done", "thread_id": thread_id})
 
     return StreamingResponse(
         event_generator(),

@@ -25,6 +25,7 @@ interface AppState {
   setMessages: (messages: ChatMessage[]) => void;
   addMessage: (message: ChatMessage) => void;
   upsertMessage: (message: ChatMessage) => void;
+  mergeMessage: (id: string, fields: Partial<ChatMessage>) => void;
 
   // Streaming
   isStreaming: boolean;
@@ -99,6 +100,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { messages: msgs };
       }
       return { messages: [...s.messages, message] };
+    }),
+  mergeMessage: (id, fields) =>
+    set((s) => {
+      const idx = s.messages.findIndex((m) => m.id === id);
+      if (idx >= 0) {
+        const msgs = [...s.messages];
+        msgs[idx] = { ...msgs[idx], ...fields, content: msgs[idx].content };
+        return { messages: msgs };
+      }
+      return s;
     }),
 
   // Streaming

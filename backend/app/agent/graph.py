@@ -210,23 +210,25 @@ class AgentManager:
         file_keys: list[str] | None = None,
     ):
         """
-        Stream using stream_mode="messages".
+        Stream using stream_mode=["messages", "updates"].
 
-        Yields (message_chunk, metadata) tuples. Each chunk is a LangChain
-        AIMessageChunk or ToolMessage with an `id` field. The frontend uses
-        the id to upsert messages in real time.
+        Yields (mode, chunk) tuples:
+        - ("messages", (AIMessageChunk|ToolMessage, metadata)) — token-level
+        - ("updates", {node_name: {state_delta}}) — node-level (tool calls, results)
         """
         graph = self.get_graph(model)
         config = self._build_config(thread_id, user_id, image_model)
         input_msg = self._build_input(message, file_keys)
 
         token_count = 0
-        async for chunk, metadata in graph.astream(
-            input_msg, config=config, stream_mode="messages"
+        async for mode, chunk in graph.astream(
+            input_msg, config=config, stream_mode=["messages", "updates"]
         ):
-            yield chunk, metadata
-            if hasattr(chunk, "content") and chunk.content:
-                token_count += 1
+            yield mode, chunk
+            if mode == "messages":
+                msg_chunk, _ = chunk
+                if hasattr(msg_chunk, "content") and msg_chunk.content:
+                    token_count += 1
 
         if token_count > 500:
             await self.notification.notify_agent_done(user_id, thread_id)
