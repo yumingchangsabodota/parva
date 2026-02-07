@@ -1,0 +1,120 @@
+{{- if .Values.litellm.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "parva.fullname" . }}-litellm-config
+  labels:
+    {{- include "parva.labels" . | nindent 4 }}
+    app.kubernetes.io/component: litellm
+data:
+  config.yaml: |
+    model_list:
+      {{- range .Values.litellm.models }}
+      - model_name: {{ .model_name }}
+        litellm_params:
+          {{- toYaml .litellm_params | nindent 10 }}
+      {{- end }}
+
+    general_settings:
+      master_key: {{ .Values.litellm.masterKey }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "parva.fullname" . }}-litellm
+  labels:
+    {{- include "parva.labels" . | nindent 4 }}
+    app.kubernetes.io/component: litellm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "parva.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: litellm
+  template:
+    metadata:
+      labels:
+        {{- include "parva.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: litellm
+    spec:
+      containers:
+        - name: litellm
+          image: "{{ .Values.litellm.image.repository }}:{{ .Values.litellm.image.tag }}"
+          args: ["--config", "/app/config.yaml", "--port", "4000"]
+          ports:
+            - name: http
+              containerPort: 4000
+          env:
+            {{- range $key, $value := .Values.litellm.providerKeys }}
+            {{- if $value }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "parva.fullname" $ }}-llm-keys
+                  key: {{ $key }}
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+          resources:
+            {{- toYaml .Values.litellm.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "parva.fullname" . }}-litellm-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "parva.fullname" . }}-litellm
+  labels:
+    {{- include "parva.labels" . | nindent 4 }}
+    app.kubernetes.io/component: litellm
+spec:
+  type: {{ .Values.litellm.service.type }}
+  ports:
+    - port: {{ .Values.litellm.service.port }}
+      targetPort: http
+      name: http
+  selector:
+    {{- include "parva.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: litellm
+---
+{{/* Only create the LLM provider keys secret if any keys are set */}}
+{{- $hasKeys := false }}
+{{- range $key, $value := .Values.litellm.providerKeys }}
+  {{- if $value }}
+    {{- $hasKeys = true }}
+  {{- end }}
+{{- end }}
+{{- if $hasKeys }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "parva.fullname" . }}-llm-keys
+  labels:
+    {{- include "parva.labels" . | nindent 4 }}
+    app.kubernetes.io/component: litellm
+type: Opaque
+stringData:
+  {{- range $key, $value := .Values.litellm.providerKeys }}
+  {{- if $value }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

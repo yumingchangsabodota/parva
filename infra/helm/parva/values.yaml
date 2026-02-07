@@ -103,10 +103,47 @@ minio:
       cpu: "1"
       memory: 1Gi
 
-# -- LiteLLM
+# -- LiteLLM (self-hosted LLM proxy)
 litellm:
-  baseUrl: http://litellm:4000/v1
-  apiKey: sk-parva
+  enabled: true
+  image:
+    repository: ghcr.io/berriai/litellm
+    tag: main-latest
+  # Internal master key — auto-generated, used for backend-to-litellm auth
+  masterKey: sk-parva-internal
+  service:
+    type: ClusterIP
+    port: 4000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  # Model routing — add your actual provider API keys here
+  models:
+    - model_name: gpt-4o
+      litellm_params:
+        model: openai/gpt-4o
+        # api_key is set via OPENAI_API_KEY env var or secret
+    - model_name: gpt-4o-mini
+      litellm_params:
+        model: openai/gpt-4o-mini
+    - model_name: claude-sonnet-4-5-20250929
+      litellm_params:
+        model: anthropic/claude-sonnet-4-5-20250929
+        # api_key is set via ANTHROPIC_API_KEY env var or secret
+    - model_name: dall-e-3
+      litellm_params:
+        model: openai/dall-e-3
+  # Provider API keys — set these to connect to actual LLM providers
+  providerKeys:
+    OPENAI_API_KEY: ""
+    ANTHROPIC_API_KEY: ""
+    # Add more providers as needed:
+    # AZURE_API_KEY: ""
+    # GOOGLE_API_KEY: ""
 
 # -- Ingress
 ingress:
