@@ -24,7 +24,7 @@ export default function ChatInput() {
   const currentThreadId = useAppStore((s) => s.currentThreadId);
   const setCurrentThread = useAppStore((s) => s.setCurrentThread);
   const addMessage = useAppStore((s) => s.addMessage);
-  const appendToLastMessage = useAppStore((s) => s.appendToLastMessage);
+  const upsertMessage = useAppStore((s) => s.upsertMessage);
   const isStreaming = useAppStore((s) => s.isStreaming);
   const setIsStreaming = useAppStore((s) => s.setIsStreaming);
   const uploadedFiles = useAppStore((s) => s.uploadedFiles);
@@ -39,19 +39,20 @@ export default function ChatInput() {
     if (!message || isStreaming) return;
 
     // Add user message to UI
-    addMessage({ role: "user", content: message, files: uploadedFiles.length > 0 ? [...uploadedFiles] : undefined });
+    addMessage({
+      id: crypto.randomUUID(),
+      role: "user",
+      content: message,
+      files: uploadedFiles.length > 0 ? [...uploadedFiles] : undefined,
+    });
     setInput("");
 
     const fileKeys = uploadedFiles.map((f) => f.key);
     clearUploadedFiles();
 
-    // Add empty assistant message for streaming
-    addMessage({ role: "assistant", content: "" });
     setIsStreaming(true);
 
     try {
-      let threadId = currentThreadId;
-
       for await (const event of streamChat({
         message,
         user_id: userId,
@@ -61,25 +62,28 @@ export default function ChatInput() {
         image_model: imageModel || undefined,
       })) {
         switch (event.type) {
-          case "thread_id":
-            threadId = event.thread_id as string;
-            if (!currentThreadId) {
-              setCurrentThread(threadId);
+          case "metadata":
+            if (event.thread_id && !currentThreadId) {
+              setCurrentThread(event.thread_id);
             }
             break;
-          case "token":
-            appendToLastMessage(event.content as string);
+          case "message_chunk":
+            if (event.message) {
+              upsertMessage(event.message);
+            }
             break;
-          case "tool_start":
-            appendToLastMessage(
-              `\n\n> **Running skill:** ${event.tool}...\n\n`
-            );
-            break;
-          case "tool_end":
-            // Tool results are incorporated by the model
+          case "message_complete":
+            if (event.message) {
+              // For complete messages (tool results, final AI), add directly
+              addMessage(event.message);
+            }
             break;
           case "error":
-            appendToLastMessage(`\n\n**Error:** ${event.error}\n`);
+            addMessage({
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: `**Error:** ${event.error}`,
+            });
             break;
           case "done":
             break;
@@ -87,7 +91,11 @@ export default function ChatInput() {
       }
     } catch (e) {
       console.error("Stream error:", e);
-      appendToLastMessage("\n\n**Connection error. Please try again.**");
+      addMessage({
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "**Connection error. Please try again.**",
+      });
     } finally {
       setIsStreaming(false);
     }

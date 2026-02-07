@@ -20,6 +20,7 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 
+from app.agent.graph import serialize_message
 from app.core.config import get_settings
 from app.models.schemas import (
     ChatRequest,
@@ -82,16 +83,22 @@ async def chat(req: ChatRequest, state=Depends(get_app_state)):
 
 @router.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest, state=Depends(get_app_state)):
-    """Stream a chat response using Server-Sent Events."""
+    """Stream raw LangGraph messages via Server-Sent Events.
+
+    Events:
+      - metadata:         {type, thread_id}
+      - message_chunk:    {type, message}  — AIMessageChunk (streaming token)
+      - message_complete: {type, message}  — ToolMessage or final AI message
+      - error:            {type, error}
+      - done:             {type, thread_id}
+    """
     thread_id = req.thread_id or str(uuid.uuid4())
 
     async def event_generator():
-        # Send thread_id first
-        yield f"data: {json.dumps({'type': 'thread_id', 'thread_id': thread_id})}\n\n"
+        yield f"data: {json.dumps({'type': 'metadata', 'thread_id': thread_id})}\n\n"
 
-        full_content = ""
         try:
-            async for event in state.agent.stream(
+            async for chunk, metadata in state.agent.stream(
                 message=req.message,
                 thread_id=thread_id,
                 user_id=req.user_id,
@@ -99,23 +106,13 @@ async def chat_stream(req: ChatRequest, state=Depends(get_app_state)):
                 image_model=req.image_model,
                 file_keys=req.files,
             ):
-                kind = event.get("event", "")
+                msg_data = serialize_message(chunk)
+                chunk_type = type(chunk).__name__
 
-                if kind == "on_chat_model_stream":
-                    chunk = event.get("data", {}).get("chunk")
-                    if chunk and hasattr(chunk, "content") and chunk.content:
-                        token = chunk.content
-                        full_content += token
-                        yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
-
-                elif kind == "on_tool_start":
-                    tool_name = event.get("name", "")
-                    yield f"data: {json.dumps({'type': 'tool_start', 'tool': tool_name})}\n\n"
-
-                elif kind == "on_tool_end":
-                    tool_name = event.get("name", "")
-                    output = event.get("data", {}).get("output", "")
-                    yield f"data: {json.dumps({'type': 'tool_end', 'tool': tool_name, 'output': str(output)[:500]})}\n\n"
+                if chunk_type == "AIMessageChunk":
+                    yield f"data: {json.dumps({'type': 'message_chunk', 'message': msg_data}, default=str)}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'message_complete', 'message': msg_data}, default=str)}\n\n"
 
         except Exception as e:
             logger.exception("Streaming error")
@@ -175,38 +172,8 @@ async def get_thread_messages(
     state=Depends(get_app_state),
 ):
     """Get messages for a thread from the LangGraph checkpointer."""
-    config = {"configurable": {"thread_id": thread_id}}
-    graph = state.agent.get_graph()
-
-    try:
-        checkpoint = await graph.aget_state(config)
-        if not checkpoint or not checkpoint.values:
-            return {"messages": []}
-
-        messages = []
-        for msg in checkpoint.values.get("messages", []):
-            role = "assistant"
-            if hasattr(msg, "type"):
-                if msg.type == "human":
-                    role = "user"
-                elif msg.type == "ai":
-                    role = "assistant"
-                elif msg.type == "tool":
-                    role = "tool"
-                elif msg.type == "system":
-                    role = "system"
-
-            content = msg.content if hasattr(msg, "content") else str(msg)
-            messages.append({
-                "role": role,
-                "content": content,
-                "metadata": msg.additional_kwargs if hasattr(msg, "additional_kwargs") else {},
-            })
-
-        return {"messages": messages}
-    except Exception as e:
-        logger.exception("Failed to get thread messages")
-        return {"messages": []}
+    messages = await state.agent.get_thread_messages(thread_id)
+    return {"messages": messages}
 
 
 # ── Files ───────────────────────────────────────────────────────────────

@@ -32,8 +32,8 @@ export default function ChatArea() {
           <WelcomeScreen />
         ) : (
           <div className="max-w-4xl mx-auto px-4 py-6 space-y-1">
-            {messages.map((msg, i) => (
-              <MessageBubble key={i} message={msg} />
+            {messages.map((msg) => (
+              <MessageBubble key={msg.id} message={msg} />
             ))}
             {isStreaming && (
               <div className="flex items-center gap-2 text-[var(--text-muted)] text-sm py-2 px-4">

@@ -1,9 +1,19 @@
+export interface ToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
 export interface ChatMessage {
+  id: string;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  name?: string;
   files?: FileRef[];
-  metadata?: Record<string, unknown>;
-  timestamp?: string;
+  additional_kwargs?: Record<string, unknown>;
+  response_metadata?: Record<string, unknown>;
 }
 
 export interface FileRef {
@@ -55,10 +65,15 @@ export interface ExecutionProgress {
   error?: string;
 }
 
+export interface StreamEvent {
+  type: "metadata" | "message_chunk" | "message_complete" | "error" | "done";
+  thread_id?: string;
+  message?: ChatMessage;
+  error?: string;
+}
+
 export interface WSEvent {
   type:
-    | "token"
-    | "message_done"
     | "execution_progress"
     | "execution_done"
     | "notification"

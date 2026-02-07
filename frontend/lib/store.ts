@@ -20,11 +20,11 @@ interface AppState {
   setThreads: (threads: ThreadSummary[]) => void;
   setCurrentThread: (id: string | null) => void;
 
-  // Messages
+  // Messages (keyed by message ID)
   messages: ChatMessage[];
   setMessages: (messages: ChatMessage[]) => void;
   addMessage: (message: ChatMessage) => void;
-  appendToLastMessage: (content: string) => void;
+  upsertMessage: (message: ChatMessage) => void;
 
   // Streaming
   isStreaming: boolean;
@@ -80,20 +80,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   setThreads: (threads) => set({ threads }),
   setCurrentThread: (id) => set({ currentThreadId: id }),
 
-  // Messages
+  // Messages (keyed by message ID)
   messages: [],
   setMessages: (messages) => set({ messages }),
   addMessage: (message) => set((s) => ({ messages: [...s.messages, message] })),
-  appendToLastMessage: (content) =>
+  upsertMessage: (message) =>
     set((s) => {
-      const msgs = [...s.messages];
-      if (msgs.length > 0 && msgs[msgs.length - 1].role === "assistant") {
-        msgs[msgs.length - 1] = {
-          ...msgs[msgs.length - 1],
-          content: msgs[msgs.length - 1].content + content,
+      const idx = s.messages.findIndex((m) => m.id === message.id);
+      if (idx >= 0) {
+        // Merge: append content for streaming chunks, overwrite other fields
+        const existing = s.messages[idx];
+        const msgs = [...s.messages];
+        msgs[idx] = {
+          ...existing,
+          ...message,
+          content: existing.content + (message.content || ""),
         };
+        return { messages: msgs };
       }
-      return { messages: msgs };
+      return { messages: [...s.messages, message] };
     }),
 
   // Streaming

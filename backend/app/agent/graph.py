@@ -55,6 +55,50 @@ You help users by understanding their requests and executing skills in isolated 
 """
 
 
+def serialize_message(msg) -> dict[str, Any]:
+    """Serialize a LangChain message object to a JSON-safe dict."""
+    data: dict[str, Any] = {
+        "id": getattr(msg, "id", None),
+        "content": msg.content if hasattr(msg, "content") else str(msg),
+    }
+
+    # Determine role from message type
+    msg_type = getattr(msg, "type", None)
+    if msg_type == "human":
+        data["role"] = "user"
+    elif msg_type == "ai":
+        data["role"] = "assistant"
+        # Include tool_calls if present
+        tool_calls = getattr(msg, "tool_calls", None)
+        if tool_calls:
+            data["tool_calls"] = [
+                {
+                    "id": tc.get("id", "") if isinstance(tc, dict) else getattr(tc, "id", ""),
+                    "name": tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", ""),
+                    "args": tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {}),
+                }
+                for tc in tool_calls
+            ]
+    elif msg_type == "tool":
+        data["role"] = "tool"
+        data["tool_call_id"] = getattr(msg, "tool_call_id", None)
+        data["name"] = getattr(msg, "name", None)
+    elif msg_type == "system":
+        data["role"] = "system"
+    else:
+        data["role"] = "assistant"
+
+    additional = getattr(msg, "additional_kwargs", {})
+    if additional:
+        data["additional_kwargs"] = additional
+
+    resp_meta = getattr(msg, "response_metadata", None)
+    if resp_meta:
+        data["response_metadata"] = resp_meta
+
+    return data
+
+
 class AgentManager:
     """Manages the LangGraph agent instance and its dependencies."""
 
@@ -120,6 +164,27 @@ class AgentManager:
         """Clear cached graphs (e.g., after skill registry changes)."""
         self._graphs.clear()
 
+    def _build_config(
+        self,
+        thread_id: str,
+        user_id: str,
+        image_model: str | None = None,
+    ) -> dict:
+        return {
+            "configurable": {
+                "thread_id": thread_id,
+                "user_id": user_id,
+                "image_model": image_model or get_settings().default_image_model,
+            }
+        }
+
+    def _build_input(self, message: str, file_keys: list[str] | None = None) -> dict:
+        content = message
+        if file_keys:
+            files_info = ", ".join(file_keys)
+            content += f"\n\n[Attached files: {files_info}]"
+        return {"messages": [{"role": "user", "content": content}]}
+
     async def invoke(
         self,
         message: str,
@@ -131,29 +196,9 @@ class AgentManager:
     ):
         """Invoke the agent with a user message. Returns the full response."""
         graph = self.get_graph(model)
-
-        # Build user message with file references
-        content = message
-        if file_keys:
-            files_info = ", ".join(file_keys)
-            content += f"\n\n[Attached files: {files_info}]"
-
-        config = {
-            "configurable": {
-                "thread_id": thread_id,
-                "user_id": user_id,
-                "image_model": image_model or get_settings().default_image_model,
-            }
-        }
-
-        # Inject config into tools so they can access user context
-        for t in graph.get_graph().nodes.values():
-            pass  # Tools get config from RunnableConfig
-
-        input_msg = {"messages": [{"role": "user", "content": content}]}
-
-        result = await graph.ainvoke(input_msg, config=config)
-        return result
+        config = self._build_config(thread_id, user_id, image_model)
+        input_msg = self._build_input(message, file_keys)
+        return await graph.ainvoke(input_msg, config=config)
 
     async def stream(
         self,
@@ -164,31 +209,41 @@ class AgentManager:
         image_model: str | None = None,
         file_keys: list[str] | None = None,
     ):
-        """Stream the agent response. Yields events for real-time UI updates."""
+        """
+        Stream using stream_mode="messages".
+
+        Yields (message_chunk, metadata) tuples. Each chunk is a LangChain
+        AIMessageChunk or ToolMessage with an `id` field. The frontend uses
+        the id to upsert messages in real time.
+        """
         graph = self.get_graph(model)
-
-        content = message
-        if file_keys:
-            files_info = ", ".join(file_keys)
-            content += f"\n\n[Attached files: {files_info}]"
-
-        config = {
-            "configurable": {
-                "thread_id": thread_id,
-                "user_id": user_id,
-                "image_model": image_model or get_settings().default_image_model,
-            }
-        }
-
-        input_msg = {"messages": [{"role": "user", "content": content}]}
+        config = self._build_config(thread_id, user_id, image_model)
+        input_msg = self._build_input(message, file_keys)
 
         token_count = 0
-        async for event in graph.astream_events(input_msg, config=config, version="v2"):
-            yield event
-            # Track token count for long-output notification
-            if event.get("event") == "on_chat_model_stream":
+        async for chunk, metadata in graph.astream(
+            input_msg, config=config, stream_mode="messages"
+        ):
+            yield chunk, metadata
+            if hasattr(chunk, "content") and chunk.content:
                 token_count += 1
 
-        # Notify if it was a long response
         if token_count > 500:
             await self.notification.notify_agent_done(user_id, thread_id)
+
+    async def get_thread_messages(self, thread_id: str, model: str | None = None) -> list[dict]:
+        """Get all messages for a thread from the checkpointer."""
+        graph = self.get_graph(model)
+        config = {"configurable": {"thread_id": thread_id}}
+
+        try:
+            state = await graph.aget_state(config)
+            if not state or not state.values:
+                return []
+            return [
+                serialize_message(msg)
+                for msg in state.values.get("messages", [])
+            ]
+        except Exception as e:
+            logger.exception("Failed to get thread messages")
+            return []

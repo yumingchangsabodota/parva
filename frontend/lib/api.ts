@@ -31,26 +31,7 @@ export async function sendMessage(params: {
   });
 }
 
-export function streamMessage(params: {
-  message: string;
-  user_id: string;
-  thread_id?: string;
-  files?: string[];
-  model?: string;
-  image_model?: string;
-}): EventSource | ReadableStreamDefaultReader<Uint8Array> {
-  // Use fetch for SSE since EventSource doesn't support POST
-  const controller = new AbortController();
-
-  const response = fetch(`${API_URL}/api/chat/stream`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-    signal: controller.signal,
-  });
-
-  return { response, controller } as any;
-}
+import type { StreamEvent } from "@/types";
 
 export async function* streamChat(params: {
   message: string;
@@ -59,7 +40,7 @@ export async function* streamChat(params: {
   files?: string[];
   model?: string;
   image_model?: string;
-}): AsyncGenerator<{ type: string; [key: string]: unknown }> {
+}): AsyncGenerator<StreamEvent> {
   const res = await fetch(`${API_URL}/api/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -106,7 +87,7 @@ export async function getThreads(userId: string) {
 }
 
 export async function getThreadMessages(threadId: string, userId: string) {
-  return fetchJSON<{ messages: Array<{ role: string; content: string; metadata?: Record<string, unknown> }> }>(
+  return fetchJSON<{ messages: Array<import("@/types").ChatMessage> }>(
     `/api/threads/${threadId}/messages?user_id=${userId}`
   );
 }

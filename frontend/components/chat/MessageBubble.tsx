@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { ChatMessage } from "@/types";
-import { Bot, User, FileText, Copy, Check } from "lucide-react";
+import { Bot, User, FileText, Copy, Check, Wrench } from "lucide-react";
 import { useState } from "react";
 
 interface Props {
@@ -16,7 +16,9 @@ export default function MessageBubble({ message }: Props) {
   const isUser = message.role === "user";
   const isTool = message.role === "tool";
 
-  if (isTool) return null; // Hide tool messages from UI
+  if (isTool) {
+    return <ToolResultBubble message={message} />;
+  }
 
   return (
     <div
@@ -51,6 +53,21 @@ export default function MessageBubble({ message }: Props) {
               >
                 <FileText size={12} />
                 {f.filename}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Tool calls (AI deciding to use a tool) */}
+        {message.tool_calls && message.tool_calls.length > 0 && (
+          <div className="flex flex-col gap-1.5 mb-2">
+            {message.tool_calls.map((tc) => (
+              <div
+                key={tc.id}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-xs text-[var(--text-secondary)]"
+              >
+                <Wrench size={12} className="text-parva-500 shrink-0" />
+                <span className="font-medium">{tc.name}</span>
               </div>
             ))}
           </div>
@@ -101,10 +118,38 @@ export default function MessageBubble({ message }: Props) {
               {message.content}
             </ReactMarkdown>
           </div>
-        ) : (
+        ) : message.tool_calls && message.tool_calls.length > 0 ? null : (
           <span className="cursor-blink text-sm" />
         )}
       </div>
+    </div>
+  );
+}
+
+function ToolResultBubble({ message }: Props) {
+  const [expanded, setExpanded] = useState(false);
+  const content = message.content || "";
+  const isLong = content.length > 300;
+
+  return (
+    <div className="ml-11 my-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] text-xs">
+      <div className="flex items-center gap-2 text-[var(--text-muted)]">
+        <Wrench size={12} className="text-parva-500" />
+        <span className="font-medium">{message.name || "Tool result"}</span>
+        {isLong && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="ml-auto text-parva-500 hover:text-parva-400"
+          >
+            {expanded ? "Collapse" : "Expand"}
+          </button>
+        )}
+      </div>
+      {content && (
+        <pre className="mt-1.5 whitespace-pre-wrap text-[var(--text-secondary)] max-h-[200px] overflow-y-auto">
+          {isLong && !expanded ? content.slice(0, 300) + "..." : content}
+        </pre>
+      )}
     </div>
   );
 }
