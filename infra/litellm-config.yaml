@@ -7,26 +7,38 @@ model_list:
     litellm_params:
       model: openai/gpt-4o
       # Uses OPENAI_API_KEY env var automatically
+    model_info:
+      access_groups: ["public"]
 
   - model_name: gpt-4o-mini
     litellm_params:
       model: openai/gpt-4o-mini
+    model_info:
+      access_groups: ["public"]
 
   - model_name: claude-sonnet-4-5-20250929
     litellm_params:
       model: anthropic/claude-sonnet-4-5-20250929
       # Uses ANTHROPIC_API_KEY env var automatically
+    model_info:
+      access_groups: ["public"]
 
   # Image models
   - model_name: dall-e-3
     litellm_params:
       model: openai/dall-e-3
+    model_info:
+      access_groups: ["public"]
 
   # Add more models as needed:
   # - model_name: gemini-2.0-flash
   #   litellm_params:
   #     model: gemini/gemini-2.0-flash
   #     api_key: os.environ/GOOGLE_API_KEY
+  #   model_info:
+  #     access_groups: ["public"]
 
 general_settings:
   master_key: sk-parva-internal
+  # Allow any internal service to call without a key
+  allow_requests_on_no_key: true

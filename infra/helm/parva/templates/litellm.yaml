@@ -13,10 +13,13 @@ data:
       - model_name: {{ .model_name }}
         litellm_params:
           {{- toYaml .litellm_params | nindent 10 }}
+        model_info:
+          access_groups: ["public"]
       {{- end }}
 
     general_settings:
       master_key: {{ .Values.litellm.masterKey }}
+      allow_requests_on_no_key: true
 ---
 apiVersion: apps/v1
 kind: Deployment
