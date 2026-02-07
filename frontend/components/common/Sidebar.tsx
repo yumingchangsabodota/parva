@@ -2,6 +2,7 @@
 
 import { useAppStore } from "@/lib/store";
 import { getThreadMessages } from "@/lib/api";
+import Link from "next/link";
 import {
   MessageSquare,
   Plus,
@@ -10,6 +11,7 @@ import {
   PanelLeft,
   Puzzle,
   Bell,
+  Shield,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -113,6 +115,13 @@ export default function Sidebar() {
 
       {/* Bottom actions */}
       <div className="border-t border-[var(--border)] p-3 space-y-1">
+        <Link
+          href="/admin"
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm hover:bg-[var(--bg-tertiary)] transition-colors text-[var(--text-secondary)]"
+        >
+          <Shield size={16} />
+          Admin
+        </Link>
         <button
           onClick={toggleSettings}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm hover:bg-[var(--bg-tertiary)] transition-colors text-[var(--text-secondary)]"
