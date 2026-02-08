@@ -1,15 +1,13 @@
 import { useAppStore } from "@/lib/store";
 import type { StreamEvent } from "@/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 function getAuthHeaders(): Record<string, string> {
   const token = useAppStore.getState().token;
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(path, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -31,7 +29,7 @@ async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
 // ── Auth ──────────────────────────────────────────────────────────────
 
 export async function login(username: string, password: string) {
-  const res = await fetch(`${API_URL}/api/auth/login`, {
+  const res = await fetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -76,7 +74,7 @@ export async function* streamChat(params: {
   model?: string;
   image_model?: string;
 }): AsyncGenerator<StreamEvent> {
-  const res = await fetch(`${API_URL}/api/chat/stream`, {
+  const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -140,7 +138,7 @@ export async function uploadFiles(userId: string, files: File[]) {
   const formData = new FormData();
   files.forEach((f) => formData.append("files", f));
 
-  const res = await fetch(`${API_URL}/api/files/upload?user_id=${userId}`, {
+  const res = await fetch(`/api/files/upload?user_id=${userId}`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: formData,

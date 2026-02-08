@@ -1,14 +1,12 @@
 import { useAppStore } from "@/lib/store";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 function getAuthHeaders(): Record<string, string> {
   const token = useAppStore.getState().token;
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(path, {
     ...options,
     headers: {
       "Content-Type": "application/json",
