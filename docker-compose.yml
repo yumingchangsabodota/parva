@@ -20,7 +20,7 @@ services:
       PARVA_MINIO_SECRET_KEY: parvasecret
       PARVA_MINIO_BUCKET: parva-files
       PARVA_LITELLM_BASE_URL: http://litellm:4000/v1
-      PARVA_LITELLM_API_KEY: sk-parva
+      PARVA_LITELLM_API_KEY: sk-parva-internal
       PARVA_EXECUTOR_IMAGE: parva-executor:latest
       PARVA_EXECUTOR_NETWORK: parva-net
       PARVA_EXECUTOR_WORKSPACE_BASE: /var/parva/workspaces

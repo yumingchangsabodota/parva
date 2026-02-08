@@ -212,14 +212,14 @@ async def system_health(state=Depends(get_app_state)):
 
     # Redis
     try:
-        await state.redis.client.ping()
+        await state.redis.redis.ping()
         checks["redis"] = {"status": "healthy"}
     except Exception as e:
         checks["redis"] = {"status": "unhealthy", "error": str(e)}
 
     # MinIO
     try:
-        buckets = await state.minio.client.list_buckets()
+        buckets = state.minio.client.list_buckets()
         checks["minio"] = {"status": "healthy", "buckets": len(buckets)}
     except Exception as e:
         checks["minio"] = {"status": "unhealthy", "error": str(e)}
@@ -249,7 +249,9 @@ async def system_health(state=Depends(get_app_state)):
 
     # Active executor containers
     try:
-        containers = await state.executor.list_containers()
+        containers = state.executor.docker.containers.list(
+            filters={"name": "parva-exec-"}
+        )
         checks["executors"] = {
             "status": "healthy",
             "active_containers": len(containers),

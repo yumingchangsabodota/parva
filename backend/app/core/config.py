@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     # LiteLLM (OpenAI-compatible)
     litellm_base_url: str = "http://litellm:4000/v1"
-    litellm_api_key: str = "sk-parva"
+    litellm_api_key: str = "sk-parva-internal"
     default_chat_model: str = "gpt-4o"
     default_image_model: str = "dall-e-3"
 
