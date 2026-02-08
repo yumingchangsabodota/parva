@@ -32,6 +32,11 @@ class AddModelRequest(BaseModel):
     model_name: str
     litellm_model: str  # e.g. "openai/gpt-4o"
     api_key: str | None = None  # optional override
+    api_base: str | None = None  # optional custom base URL
+
+
+class TestModelRequest(BaseModel):
+    model_name: str  # model name as registered in LiteLLM
 
 
 class SetDefaultModelRequest(BaseModel):
@@ -72,6 +77,8 @@ async def add_model(req: AddModelRequest, state=Depends(get_app_state)):
     }
     if req.api_key:
         payload["litellm_params"]["api_key"] = req.api_key
+    if req.api_base:
+        payload["litellm_params"]["api_base"] = req.api_base
 
     try:
         async with httpx.AsyncClient() as client:
@@ -105,6 +112,33 @@ async def delete_model(model_id: str, state=Depends(get_app_state)):
     except Exception as e:
         logger.exception("Failed to delete model")
         raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/models/test")
+async def test_model(req: TestModelRequest, state=Depends(get_app_state)):
+    """Test a model connection by sending a minimal chat completion."""
+    settings = get_settings()
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{settings.litellm_base_url}/chat/completions",
+                json={
+                    "model": req.model_name,
+                    "messages": [{"role": "user", "content": "Say hi"}],
+                    "max_tokens": 5,
+                },
+                headers={"Authorization": f"Bearer {settings.litellm_api_key}"},
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                return {"status": "ok", "response": content}
+            else:
+                error = resp.text
+                return {"status": "error", "error": f"HTTP {resp.status_code}: {error}"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 
 @router.get("/models/defaults")

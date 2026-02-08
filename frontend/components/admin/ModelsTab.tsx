@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getAdminModels, addModel, deleteModel, getDefaultModels, setDefaultModels } from "@/lib/admin-api";
-import { Plus, Trash2, Star, Loader2 } from "lucide-react";
+import { getAdminModels, addModel, deleteModel, testModel, getDefaultModels, setDefaultModels } from "@/lib/admin-api";
+import { Plus, Trash2, Star, Loader2, Zap, CheckCircle, XCircle } from "lucide-react";
 
 interface ModelEntry {
   model_name: string;
@@ -21,7 +21,10 @@ export default function ModelsTab() {
   const [newModelName, setNewModelName] = useState("");
   const [newLitellmModel, setNewLitellmModel] = useState("");
   const [newApiKey, setNewApiKey] = useState("");
+  const [newApiBase, setNewApiBase] = useState("");
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { status: string; message: string }>>({});
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -49,10 +52,12 @@ export default function ModelsTab() {
         model_name: newModelName,
         litellm_model: newLitellmModel,
         api_key: newApiKey || undefined,
+        api_base: newApiBase || undefined,
       });
       setNewModelName("");
       setNewLitellmModel("");
       setNewApiKey("");
+      setNewApiBase("");
       setShowAdd(false);
       await loadData();
     } catch (e) {
@@ -69,6 +74,32 @@ export default function ModelsTab() {
       await loadData();
     } catch (e) {
       console.error("Failed to delete model:", e);
+    }
+  };
+
+  const handleTest = async (modelName: string) => {
+    setTesting(modelName);
+    setTestResults((prev) => ({ ...prev, [modelName]: { status: "testing", message: "Testing..." } }));
+    try {
+      const result = await testModel(modelName);
+      if (result.status === "ok") {
+        setTestResults((prev) => ({
+          ...prev,
+          [modelName]: { status: "ok", message: result.response || "Connection successful" },
+        }));
+      } else {
+        setTestResults((prev) => ({
+          ...prev,
+          [modelName]: { status: "error", message: result.error || "Connection failed" },
+        }));
+      }
+    } catch (e) {
+      setTestResults((prev) => ({
+        ...prev,
+        [modelName]: { status: "error", message: e instanceof Error ? e.message : "Test failed" },
+      }));
+    } finally {
+      setTesting(null);
     }
   };
 
@@ -113,28 +144,47 @@ export default function ModelsTab() {
       {/* Add model form */}
       {showAdd && (
         <div className="mb-4 p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input
-              type="text"
-              placeholder="Display name (e.g. gpt-4o)"
-              value={newModelName}
-              onChange={(e) => setNewModelName(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-sm"
-            />
-            <input
-              type="text"
-              placeholder="LiteLLM model (e.g. openai/gpt-4o)"
-              value={newLitellmModel}
-              onChange={(e) => setNewLitellmModel(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-sm"
-            />
-            <input
-              type="password"
-              placeholder="API key (optional override)"
-              value={newApiKey}
-              onChange={(e) => setNewApiKey(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-sm"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-[var(--text-muted)] mb-1">Display Name</label>
+              <input
+                type="text"
+                placeholder="e.g. gpt-4o"
+                value={newModelName}
+                onChange={(e) => setNewModelName(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-[var(--text-muted)] mb-1">LiteLLM Model ID</label>
+              <input
+                type="text"
+                placeholder="e.g. openai/gpt-4o"
+                value={newLitellmModel}
+                onChange={(e) => setNewLitellmModel(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-[var(--text-muted)] mb-1">API Base URL (optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. https://api.openai.com/v1"
+                value={newApiBase}
+                onChange={(e) => setNewApiBase(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-[var(--text-muted)] mb-1">API Key (optional)</label>
+              <input
+                type="password"
+                placeholder="sk-..."
+                value={newApiKey}
+                onChange={(e) => setNewApiKey(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-sm"
+              />
+            </div>
           </div>
           <div className="flex justify-end gap-2 mt-3">
             <button
@@ -168,53 +218,96 @@ export default function ModelsTab() {
           <div className="text-center text-[var(--text-muted)] py-8">No models configured</div>
         )}
         {models.map((m) => {
-          const modelId = (m.model_info as any)?.id || m.model_name;
+          const modelId = (m.model_info as Record<string, unknown>)?.id as string || m.model_name;
           const provider = String(m.litellm_params?.model || "").split("/")[0] || "unknown";
+          const apiBase = m.litellm_params?.api_base as string | undefined;
+          const hasKey = !!m.litellm_params?.api_key;
           const isDefaultChat = defaults.chat_model === m.model_name;
           const isDefaultImage = defaults.image_model === m.model_name;
+          const testResult = testResults[m.model_name];
 
           return (
             <div
               key={modelId}
-              className="flex items-center justify-between p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]"
+              className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]"
             >
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-[var(--text-primary)]">{m.model_name}</span>
-                  <span className="px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-xs text-[var(--text-muted)]">
-                    {provider}
-                  </span>
-                  {isDefaultChat && (
-                    <span className="px-2 py-0.5 rounded-full bg-parva-600/20 text-parva-500 text-xs">
-                      Default Chat
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-[var(--text-primary)]">{m.model_name}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-xs text-[var(--text-muted)]">
+                      {provider}
                     </span>
-                  )}
-                  {isDefaultImage && (
-                    <span className="px-2 py-0.5 rounded-full bg-parva-600/20 text-parva-500 text-xs">
-                      Default Image
-                    </span>
-                  )}
+                    {hasKey && (
+                      <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 text-xs">
+                        Key Set
+                      </span>
+                    )}
+                    {isDefaultChat && (
+                      <span className="px-2 py-0.5 rounded-full bg-parva-600/20 text-parva-500 text-xs">
+                        Default Chat
+                      </span>
+                    )}
+                    {isDefaultImage && (
+                      <span className="px-2 py-0.5 rounded-full bg-parva-600/20 text-parva-500 text-xs">
+                        Default Image
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)] mt-1">
+                    {String(m.litellm_params?.model || "")}
+                    {apiBase && (
+                      <span className="ml-2 text-[var(--text-muted)]">
+                        @ {apiBase}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs text-[var(--text-muted)] mt-1">
-                  {String(m.litellm_params?.model || "")}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleTest(m.model_name)}
+                    disabled={testing === m.model_name}
+                    className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-yellow-500 disabled:opacity-40"
+                    title="Test connection"
+                  >
+                    {testing === m.model_name ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Zap size={14} />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleSetDefault(m.model_name, "chat")}
+                    className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-parva-500"
+                    title="Set as default chat model"
+                  >
+                    <Star size={14} fill={isDefaultChat ? "currentColor" : "none"} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(modelId)}
+                    className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-red-500"
+                    title="Delete model"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleSetDefault(m.model_name, "chat")}
-                  className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-parva-500"
-                  title="Set as default chat model"
-                >
-                  <Star size={14} fill={isDefaultChat ? "currentColor" : "none"} />
-                </button>
-                <button
-                  onClick={() => handleDelete(modelId)}
-                  className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-red-500"
-                  title="Delete model"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
+
+              {/* Test result */}
+              {testResult && (
+                <div className={`mt-2 px-3 py-2 rounded-lg text-xs flex items-center gap-2 ${
+                  testResult.status === "ok"
+                    ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                    : testResult.status === "testing"
+                    ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                    : "bg-red-500/10 text-red-400 border border-red-500/20"
+                }`}>
+                  {testResult.status === "ok" ? <CheckCircle size={12} /> :
+                   testResult.status === "testing" ? <Loader2 size={12} className="animate-spin" /> :
+                   <XCircle size={12} />}
+                  <span className="truncate">{testResult.message}</span>
+                </div>
+              )}
             </div>
           );
         })}

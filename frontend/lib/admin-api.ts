@@ -40,6 +40,7 @@ export async function addModel(params: {
   model_name: string;
   litellm_model: string;
   api_key?: string;
+  api_base?: string;
 }) {
   return fetchJSON("/api/admin/models", {
     method: "POST",
@@ -49,6 +50,16 @@ export async function addModel(params: {
 
 export async function deleteModel(modelId: string) {
   return fetchJSON(`/api/admin/models/${modelId}`, { method: "DELETE" });
+}
+
+export async function testModel(modelName: string) {
+  return fetchJSON<{ status: string; response?: string; error?: string }>(
+    "/api/admin/models/test",
+    {
+      method: "POST",
+      body: JSON.stringify({ model_name: modelName }),
+    }
+  );
 }
 
 export async function getDefaultModels() {
