@@ -42,6 +42,10 @@ general_settings:
   master_key: sk-parva-internal
   # Allow any internal service to call without a key
   allow_requests_on_no_key: true
+  # Forward client headers (e.g. auth) to LLM providers
+  forward_client_headers_to_llm_api: true
+  # Store model config in DB so admin UI can manage models
+  store_model_in_db: true
   # PostgreSQL for storing keys, usage tracking, spend logs
   # DATABASE_URL is set via env var — LiteLLM auto-creates its tables
   database_url: os.environ/DATABASE_URL
