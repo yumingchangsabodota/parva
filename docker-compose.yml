@@ -103,6 +103,7 @@ services:
     environment:
       DATABASE_URL: postgresql://parva:parva@postgres:5432/parva
       LITELLM_MASTER_KEY: sk-parva-internal
+      STORE_MODEL_IN_DB: "True"
       # Set your LLM provider API keys here
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
