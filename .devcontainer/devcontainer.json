@@ -10,9 +10,9 @@
   "portsAttributes": {
     "3000": { "label": "Frontend", "onAutoForward": "openBrowser" },
     "8000": { "label": "Backend API", "onAutoForward": "notify" },
-    "4000": { "label": "LiteLLM", "onAutoForward": "ignore" },
-    "8081": { "label": "Redis Commander", "onAutoForward": "ignore" },
-    "9001": { "label": "MinIO Console", "onAutoForward": "ignore" }
+    "4000": { "label": "LiteLLM", "onAutoForward": "notify" },
+    "8081": { "label": "Redis Commander", "onAutoForward": "notify" },
+    "9001": { "label": "MinIO Console", "onAutoForward": "notify" }
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
   "secrets": {
