@@ -177,7 +177,7 @@ export async function importSkill(url: string, name?: string) {
 // ── Models ───────────────────────────────────────────────────────────
 
 export async function getModels() {
-  return fetchJSON<Array<{ id: string; name: string; type: string }>>("/api/models");
+  return fetchJSON<Array<{ id: string; name: string; type: "chat" | "image" }>>("/api/models");
 }
 
 export async function getModelPreferences(userId: string) {
