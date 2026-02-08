@@ -38,12 +38,7 @@ export default function Sidebar() {
     setCurrentThread(threadId);
     try {
       const data = await getThreadMessages(threadId, userId);
-      setMessages(
-        data.messages.map((m: { role: string; content: string }) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        }))
-      );
+      setMessages(data.messages);
     } catch (e) {
       console.error("Failed to load thread messages:", e);
     }
