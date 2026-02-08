@@ -1,6 +1,7 @@
 "use client";
 
 import { useAppStore } from "@/lib/store";
+import { useRouter } from "next/navigation";
 import { getThreadMessages } from "@/lib/api";
 import Link from "next/link";
 import {
@@ -9,12 +10,12 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeft,
-  Puzzle,
-  Bell,
   Shield,
+  LogOut,
 } from "lucide-react";
 
 export default function Sidebar() {
+  const router = useRouter();
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleSettings = useAppStore((s) => s.toggleSettings);
@@ -23,6 +24,8 @@ export default function Sidebar() {
   const setCurrentThread = useAppStore((s) => s.setCurrentThread);
   const setMessages = useAppStore((s) => s.setMessages);
   const userId = useAppStore((s) => s.userId);
+  const user = useAppStore((s) => s.user);
+  const logout = useAppStore((s) => s.logout);
   const notifications = useAppStore((s) => s.notifications);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -44,6 +47,11 @@ export default function Sidebar() {
     } catch (e) {
       console.error("Failed to load thread messages:", e);
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
   };
 
   if (!sidebarOpen) {
@@ -115,13 +123,15 @@ export default function Sidebar() {
 
       {/* Bottom actions */}
       <div className="border-t border-[var(--border)] p-3 space-y-1">
-        <Link
-          href="/admin"
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm hover:bg-[var(--bg-tertiary)] transition-colors text-[var(--text-secondary)]"
-        >
-          <Shield size={16} />
-          Admin
-        </Link>
+        {user?.role === "admin" && (
+          <Link
+            href="/admin"
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm hover:bg-[var(--bg-tertiary)] transition-colors text-[var(--text-secondary)]"
+          >
+            <Shield size={16} />
+            Admin
+          </Link>
+        )}
         <button
           onClick={toggleSettings}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm hover:bg-[var(--bg-tertiary)] transition-colors text-[var(--text-secondary)]"
@@ -134,6 +144,25 @@ export default function Sidebar() {
             </span>
           )}
         </button>
+
+        {/* User info + Logout */}
+        <div className="flex items-center gap-2 px-3 py-2 mt-2 border-t border-[var(--border)] pt-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-[var(--text-primary)] truncate">
+              {user?.display_name || "User"}
+            </div>
+            <div className="text-xs text-[var(--text-muted)] truncate">
+              {user?.role || "user"}
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors text-[var(--text-muted)] hover:text-red-400"
+            title="Sign out"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );

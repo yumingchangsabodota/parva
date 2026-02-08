@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     executor_memory_limit: str = "512m"
     executor_cpu_limit: float = 1.0
 
+    # Auth
+    jwt_secret: str = "parva-dev-secret-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expiry_hours: int = 24
+
     # WebSocket / Notifications
     ws_heartbeat_interval: int = 30
 

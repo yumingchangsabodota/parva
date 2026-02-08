@@ -1,14 +1,29 @@
+import { useAppStore } from "@/lib/store";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function getAuthHeaders(): Record<string, string> {
+  const token = useAppStore.getState().token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
       ...options?.headers,
     },
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      useAppStore.getState().logout();
+      if (typeof window !== "undefined") window.location.href = "/login";
+    }
+    if (res.status === 403) {
+      throw new Error("Admin access required");
+    }
     const error = await res.text();
     throw new Error(`API error ${res.status}: ${error}`);
   }

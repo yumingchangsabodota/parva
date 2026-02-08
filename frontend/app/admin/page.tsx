@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Cpu, Puzzle, Key, Activity } from "lucide-react";
 import Link from "next/link";
+import { useAppStore } from "@/lib/store";
 import ModelsTab from "@/components/admin/ModelsTab";
 import SkillsTab from "@/components/admin/SkillsTab";
 import ProvidersTab from "@/components/admin/ProvidersTab";
@@ -18,7 +20,20 @@ const tabs = [
 type TabId = (typeof tabs)[number]["id"];
 
 export default function AdminPage() {
+  const router = useRouter();
+  const isAuthenticated = useAppStore((s) => s.isAuthenticated);
+  const user = useAppStore((s) => s.user);
   const [activeTab, setActiveTab] = useState<TabId>("models");
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace("/login");
+    } else if (user?.role !== "admin") {
+      router.replace("/");
+    }
+  }, [isAuthenticated, user, router]);
+
+  if (!isAuthenticated || user?.role !== "admin") return null;
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">

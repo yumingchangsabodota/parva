@@ -1,18 +1,55 @@
+import { useAppStore } from "@/lib/store";
+import type { StreamEvent } from "@/types";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function getAuthHeaders(): Record<string, string> {
+  const token = useAppStore.getState().token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
       ...options?.headers,
     },
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      useAppStore.getState().logout();
+      if (typeof window !== "undefined") window.location.href = "/login";
+    }
     const error = await res.text();
     throw new Error(`API error ${res.status}: ${error}`);
   }
   return res.json();
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────
+
+export async function login(username: string, password: string) {
+  const res = await fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(res.status === 401 ? "Invalid credentials" : `Login failed: ${error}`);
+  }
+  return res.json() as Promise<{
+    token: string;
+    user: { id: string; username: string; role: string; display_name: string };
+  }>;
+}
+
+export async function getMe() {
+  return fetchJSON<{ id: string; username: string; role: string; display_name: string }>(
+    "/api/auth/me"
+  );
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────
@@ -31,8 +68,6 @@ export async function sendMessage(params: {
   });
 }
 
-import type { StreamEvent } from "@/types";
-
 export async function* streamChat(params: {
   message: string;
   user_id: string;
@@ -43,11 +78,18 @@ export async function* streamChat(params: {
 }): AsyncGenerator<StreamEvent> {
   const res = await fetch(`${API_URL}/api/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
     body: JSON.stringify(params),
   });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      useAppStore.getState().logout();
+      if (typeof window !== "undefined") window.location.href = "/login";
+    }
     throw new Error(`Stream error ${res.status}`);
   }
 
@@ -100,6 +142,7 @@ export async function uploadFiles(userId: string, files: File[]) {
 
   const res = await fetch(`${API_URL}/api/files/upload?user_id=${userId}`, {
     method: "POST",
+    headers: getAuthHeaders(),
     body: formData,
   });
   if (!res.ok) throw new Error(`Upload failed: ${res.status}`);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { getSkills, getModels, getModelPreferences, getThreads } from "@/lib/api";
@@ -10,6 +11,8 @@ import NotificationToast from "@/components/notifications/NotificationToast";
 import SettingsPanel from "@/components/common/SettingsPanel";
 
 export default function Home() {
+  const router = useRouter();
+  const isAuthenticated = useAppStore((s) => s.isAuthenticated);
   const userId = useAppStore((s) => s.userId);
   const setSkills = useAppStore((s) => s.setSkills);
   const setModels = useAppStore((s) => s.setModels);
@@ -18,21 +21,20 @@ export default function Home() {
   const setThreads = useAppStore((s) => s.setThreads);
   const settingsOpen = useAppStore((s) => s.settingsOpen);
 
-  // Save user ID to localStorage on first load
+  // Redirect to login if not authenticated
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("parva_user_id");
-      if (!stored) {
-        localStorage.setItem("parva_user_id", userId);
-      }
+    if (!isAuthenticated) {
+      router.replace("/login");
     }
-  }, [userId]);
+  }, [isAuthenticated, router]);
 
   // Initialize WebSocket connection
   useWebSocket();
 
   // Load initial data
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const load = async () => {
       try {
         const [skills, models, prefs, threads] = await Promise.allSettled([
@@ -54,7 +56,7 @@ export default function Home() {
       }
     };
     load();
-  }, [userId]);
+  }, [userId, isAuthenticated]);
 
   // Request notification permission
   useEffect(() => {
@@ -64,6 +66,8 @@ export default function Home() {
       }
     }
   }, []);
+
+  if (!isAuthenticated) return null;
 
   return (
     <div className="flex h-screen">

@@ -9,7 +9,21 @@ import type {
   Notification,
 } from "@/types";
 
+export interface AuthUser {
+  id: string;
+  username: string;
+  role: string;
+  display_name: string;
+}
+
 interface AppState {
+  // Auth
+  token: string | null;
+  user: AuthUser | null;
+  isAuthenticated: boolean;
+  setAuth: (token: string, user: AuthUser) => void;
+  logout: () => void;
+
   // User
   userId: string;
   setUserId: (id: string) => void;
@@ -67,115 +81,143 @@ interface AppState {
   toggleSettings: () => void;
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
-  // User
-  userId: typeof window !== "undefined" ? localStorage.getItem("parva_user_id") || crypto.randomUUID() : crypto.randomUUID(),
-  setUserId: (id) => {
-    if (typeof window !== "undefined") localStorage.setItem("parva_user_id", id);
-    set({ userId: id });
-  },
+function getStoredAuth(): { token: string | null; user: AuthUser | null } {
+  if (typeof window === "undefined") return { token: null, user: null };
+  const token = localStorage.getItem("parva_token");
+  const userStr = localStorage.getItem("parva_user");
+  const user = userStr ? JSON.parse(userStr) : null;
+  return { token, user };
+}
 
-  // Threads
-  threads: [],
-  currentThreadId: null,
-  setThreads: (threads) => set({ threads }),
-  setCurrentThread: (id) => set({ currentThreadId: id }),
+export const useAppStore = create<AppState>((set, get) => {
+  const stored = getStoredAuth();
 
-  // Messages (keyed by message ID)
-  messages: [],
-  setMessages: (messages) => set({ messages }),
-  addMessage: (message) => set((s) => ({ messages: [...s.messages, message] })),
-  upsertMessage: (message) =>
-    set((s) => {
-      const idx = s.messages.findIndex((m) => m.id === message.id);
-      if (idx >= 0) {
-        // Merge: append content for streaming chunks, overwrite other fields
-        const existing = s.messages[idx];
-        const msgs = [...s.messages];
-        msgs[idx] = {
-          ...existing,
-          ...message,
-          content: existing.content + (message.content || ""),
-        };
-        return { messages: msgs };
-      }
-      return { messages: [...s.messages, message] };
-    }),
-  mergeMessage: (id, fields) =>
-    set((s) => {
-      const idx = s.messages.findIndex((m) => m.id === id);
-      if (idx >= 0) {
-        const msgs = [...s.messages];
-        msgs[idx] = { ...msgs[idx], ...fields, content: msgs[idx].content };
-        return { messages: msgs };
-      }
-      return s;
-    }),
+  return {
+    // Auth
+    token: stored.token,
+    user: stored.user,
+    isAuthenticated: !!stored.token,
+    setAuth: (token, user) => {
+      localStorage.setItem("parva_token", token);
+      localStorage.setItem("parva_user", JSON.stringify(user));
+      localStorage.setItem("parva_user_id", user.id);
+      set({ token, user, isAuthenticated: true, userId: user.id });
+    },
+    logout: () => {
+      localStorage.removeItem("parva_token");
+      localStorage.removeItem("parva_user");
+      set({ token: null, user: null, isAuthenticated: false, threads: [], messages: [], currentThreadId: null });
+    },
 
-  // Streaming
-  isStreaming: false,
-  setIsStreaming: (s) => set({ isStreaming: s }),
+    // User
+    userId: stored.user?.id || (typeof window !== "undefined" ? localStorage.getItem("parva_user_id") || crypto.randomUUID() : crypto.randomUUID()),
+    setUserId: (id) => {
+      if (typeof window !== "undefined") localStorage.setItem("parva_user_id", id);
+      set({ userId: id });
+    },
 
-  // Files
-  uploadedFiles: [],
-  addUploadedFile: (file) =>
-    set((s) => ({ uploadedFiles: [...s.uploadedFiles, file] })),
-  removeUploadedFile: (key) =>
-    set((s) => ({ uploadedFiles: s.uploadedFiles.filter((f) => f.key !== key) })),
-  clearUploadedFiles: () => set({ uploadedFiles: [] }),
+    // Threads
+    threads: [],
+    currentThreadId: null,
+    setThreads: (threads) => set({ threads }),
+    setCurrentThread: (id) => set({ currentThreadId: id }),
 
-  // Skills
-  skills: [],
-  setSkills: (skills) => set({ skills }),
+    // Messages (keyed by message ID)
+    messages: [],
+    setMessages: (messages) => set({ messages }),
+    addMessage: (message) => set((s) => ({ messages: [...s.messages, message] })),
+    upsertMessage: (message) =>
+      set((s) => {
+        const idx = s.messages.findIndex((m) => m.id === message.id);
+        if (idx >= 0) {
+          // Merge: append content for streaming chunks, overwrite other fields
+          const existing = s.messages[idx];
+          const msgs = [...s.messages];
+          msgs[idx] = {
+            ...existing,
+            ...message,
+            content: existing.content + (message.content || ""),
+          };
+          return { messages: msgs };
+        }
+        return { messages: [...s.messages, message] };
+      }),
+    mergeMessage: (id, fields) =>
+      set((s) => {
+        const idx = s.messages.findIndex((m) => m.id === id);
+        if (idx >= 0) {
+          const msgs = [...s.messages];
+          msgs[idx] = { ...msgs[idx], ...fields, content: msgs[idx].content };
+          return { messages: msgs };
+        }
+        return s;
+      }),
 
-  // Models
-  models: [],
-  chatModel: null,
-  imageModel: null,
-  setModels: (models) => set({ models }),
-  setChatModel: (model) => set({ chatModel: model }),
-  setImageModel: (model) => set({ imageModel: model }),
+    // Streaming
+    isStreaming: false,
+    setIsStreaming: (s) => set({ isStreaming: s }),
 
-  // Executions
-  activeExecutions: new Map(),
-  updateExecution: (progress) =>
-    set((s) => {
-      const map = new Map(s.activeExecutions);
-      map.set(progress.execution_id, progress);
-      return { activeExecutions: map };
-    }),
-  removeExecution: (id) =>
-    set((s) => {
-      const map = new Map(s.activeExecutions);
-      map.delete(id);
-      return { activeExecutions: map };
-    }),
+    // Files
+    uploadedFiles: [],
+    addUploadedFile: (file) =>
+      set((s) => ({ uploadedFiles: [...s.uploadedFiles, file] })),
+    removeUploadedFile: (key) =>
+      set((s) => ({ uploadedFiles: s.uploadedFiles.filter((f) => f.key !== key) })),
+    clearUploadedFiles: () => set({ uploadedFiles: [] }),
 
-  // Notifications
-  notifications: [],
-  addNotification: (n) =>
-    set((s) => ({
-      notifications: [
-        {
-          ...n,
-          id: crypto.randomUUID(),
-          timestamp: new Date(),
-          read: false,
-        },
-        ...s.notifications,
-      ].slice(0, 50),
-    })),
-  markNotificationRead: (id) =>
-    set((s) => ({
-      notifications: s.notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n
-      ),
-    })),
-  clearNotifications: () => set({ notifications: [] }),
+    // Skills
+    skills: [],
+    setSkills: (skills) => set({ skills }),
 
-  // UI
-  sidebarOpen: true,
-  settingsOpen: false,
-  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
-  toggleSettings: () => set((s) => ({ settingsOpen: !s.settingsOpen })),
-}));
+    // Models
+    models: [],
+    chatModel: null,
+    imageModel: null,
+    setModels: (models) => set({ models }),
+    setChatModel: (model) => set({ chatModel: model }),
+    setImageModel: (model) => set({ imageModel: model }),
+
+    // Executions
+    activeExecutions: new Map(),
+    updateExecution: (progress) =>
+      set((s) => {
+        const map = new Map(s.activeExecutions);
+        map.set(progress.execution_id, progress);
+        return { activeExecutions: map };
+      }),
+    removeExecution: (id) =>
+      set((s) => {
+        const map = new Map(s.activeExecutions);
+        map.delete(id);
+        return { activeExecutions: map };
+      }),
+
+    // Notifications
+    notifications: [],
+    addNotification: (n) =>
+      set((s) => ({
+        notifications: [
+          {
+            ...n,
+            id: crypto.randomUUID(),
+            timestamp: new Date(),
+            read: false,
+          },
+          ...s.notifications,
+        ].slice(0, 50),
+      })),
+    markNotificationRead: (id) =>
+      set((s) => ({
+        notifications: s.notifications.map((n) =>
+          n.id === id ? { ...n, read: true } : n
+        ),
+      })),
+    clearNotifications: () => set({ notifications: [] }),
+
+    // UI
+    sidebarOpen: true,
+    settingsOpen: false,
+    toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+    toggleSettings: () => set((s) => ({ settingsOpen: !s.settingsOpen })),
+  };
+});
