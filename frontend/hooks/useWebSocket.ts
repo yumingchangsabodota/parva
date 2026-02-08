@@ -8,7 +8,7 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>(undefined);
   const userId = useAppStore((s) => s.userId);
   const addNotification = useAppStore((s) => s.addNotification);
   const updateExecution = useAppStore((s) => s.updateExecution);
