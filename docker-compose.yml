@@ -94,7 +94,7 @@ services:
 
   # ── LiteLLM (LLM proxy) ─────────────────────────────────────────────
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    image: ghcr.io/berriai/litellm-database:main-latest
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     volumes:
       - ./infra/litellm-config.yaml:/app/config.yaml:ro
