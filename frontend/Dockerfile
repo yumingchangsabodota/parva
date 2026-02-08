@@ -7,6 +7,10 @@ COPY package.json ./
 RUN npm install
 
 COPY . .
+
+# Set backend URL for Next.js rewrites (resolved at build time)
+ENV BACKEND_URL=http://backend:8000
+
 RUN npm run build
 
 # Production stage
