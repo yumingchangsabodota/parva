@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     # LiteLLM (OpenAI-compatible)
     litellm_base_url: str = "http://litellm:4000/v1"
     litellm_api_key: str = "sk-parva-internal"
-    default_chat_model: str = "gpt-4o"
+    default_chat_model: str = "claude-sonnet-4-5-20250929"
     default_image_model: str = "dall-e-3"
 
     # Postgres
