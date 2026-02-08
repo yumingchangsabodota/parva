@@ -69,40 +69,40 @@ async def lifespan(app: FastAPI):
     notification = NotificationService(redis)
 
     # Initialize LangGraph Postgres checkpointer
-    checkpointer = AsyncPostgresSaver.from_conn_string(settings.postgres_dsn)
-    await checkpointer.setup()
+    async with AsyncPostgresSaver.from_conn_string(settings.postgres_dsn) as checkpointer:
+        await checkpointer.setup()
 
-    # Initialize agent manager
-    agent = AgentManager(
-        redis=redis,
-        minio=minio,
-        skill_registry=skill_registry,
-        executor=executor,
-        notification=notification,
-        checkpointer=checkpointer,
-    )
+        # Initialize agent manager
+        agent = AgentManager(
+            redis=redis,
+            minio=minio,
+            skill_registry=skill_registry,
+            executor=executor,
+            notification=notification,
+            checkpointer=checkpointer,
+        )
 
-    # Start periodic cleanup task
-    cleanup_task = asyncio.create_task(_periodic_cleanup(executor))
+        # Start periodic cleanup task
+        cleanup_task = asyncio.create_task(_periodic_cleanup(executor))
 
-    app_state = AppState(
-        redis=redis,
-        minio=minio,
-        executor=executor,
-        notification=notification,
-        skill_registry=skill_registry,
-        agent=agent,
-        checkpointer=checkpointer,
-        cleanup_task=cleanup_task,
-    )
+        app_state = AppState(
+            redis=redis,
+            minio=minio,
+            executor=executor,
+            notification=notification,
+            skill_registry=skill_registry,
+            agent=agent,
+            checkpointer=checkpointer,
+            cleanup_task=cleanup_task,
+        )
 
-    logger.info("Parva platform ready!")
-    yield
+        logger.info("Parva platform ready!")
+        yield
 
-    # Shutdown
-    logger.info("Shutting down Parva platform...")
-    cleanup_task.cancel()
-    await redis.close()
+        # Shutdown
+        logger.info("Shutting down Parva platform...")
+        cleanup_task.cancel()
+        await redis.close()
 
 
 app = FastAPI(
