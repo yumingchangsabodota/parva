@@ -160,6 +160,7 @@ export async function getSkills() {
     name: string;
     description: string;
     version: string;
+    author: string;
     params: Array<{ name: string; type: string; description: string; required: boolean }>;
     tags: string[];
     builtin: boolean;
